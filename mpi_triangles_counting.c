@@ -36,7 +36,7 @@ int n;                              // Tamano del bloque
 int mult_blocks_receive_counter;    // Conteo de bloques recibidos para multiplicacin de matrices.
 int el_mult_blocks_receive_counter; // Conteo de bloques recibidos para multiplicacin de matrices.
 int triangles_count;                // Triangulos encontrados por cada proceso
-
+int nw;
 // Algoritmo serial de conteo de triangulos
 void calculate_triangles()
 {
@@ -90,6 +90,12 @@ void initialize_matrix()
             }
         }        
         fscanf_result = fscanf(fin, "%d", &i);
+    }
+
+    for (int i = nw; i < nodes_count; i++)
+    {
+        matrix[i][0] = 1;
+        matrix[0][i] = 1;
     }
 }
 
@@ -466,7 +472,12 @@ int main(int argc, char **argv)
         if (fscanf_result != 1 || nodes_count > 0) {
             printf("Conteo de nodos: %d\n", nodes_count);
             // Graph matrix is required to be conformally partitioned to blocks.
-            if (nodes_count%q==0) {
+            if (nodes_count % q != 0) 
+            {
+                nw = nodes_count;
+                nodes_count += q - (nodes_count % q);
+            }
+            if (nodes_count % q ==0) {
                 printf("Algoritmo iniciado, por favor espere...\n");
                 initialize_matrix();
                 clock_t t1 = clock();
