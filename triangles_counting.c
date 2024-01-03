@@ -1,25 +1,13 @@
-// --------------------------------------------------------------------------------
-//
-// This program implements Scalable Triangle Counting algorithm
-// introduced by S.Acerm, A.Yasar, S.Rajamanickam, M.Wolf and U.Catalyurek.
-// In this version, algorithm calculation are performed in serial.
-// Graph is read from an input file created by RandomGraph generator by S.Pettie 
-// and V.Ramachandran.
-//
-// Author: Angelos Stamatiou, February 2020
-//
-// --------------------------------------------------------------------------------
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-FILE *fin;       // Input file.
-int nodes_count; // Graph nodes count.
-int **matrix;    // Graph nodes matrix.
+FILE *fin;       
+int nodes_count; 
+int **matrix;  
 
-// This function calculates triangles in a Graph, by performing (M*M).*M calculation, for
-// the elements below the Graph matrix diagonal.
+
+// Algoritmo serial
 void calculate_triangles()
 {
     int triangles_count = 0;
@@ -44,7 +32,6 @@ void calculate_triangles()
     free(mult);    
 }
 
-// This function initializes the Graph matrix, by reading the input file.
 void initialize_matrix()
 {
     int i,j,fscanf_result;
@@ -75,9 +62,7 @@ void initialize_matrix()
     }
 }
 
-// Auxiliary function that displays a message in case of wrong input parameters.
-// Inputs:
-//      char *compiled_name: Programms compiled name.
+
 void syntax_message(char *compiled_name)
 {
     printf("Correct syntax:\n");
@@ -86,13 +71,6 @@ void syntax_message(char *compiled_name)
     printf("<input-file> is the file containing a generated graph by RandomGraph that the algorithm will use.\n");
 }
 
-// This function checks run-time parameters validity and
-// retrieves D-step value, input and output file names.
-// Inputs:
-//      char **argv: The run-time parameters.
-// Output:
-//      1 --> Parameters read succussfully.
-//      0 --> Something went wrong.
 int read_parameters(char **argv)
 {
     char *input_filename = argv[1];
@@ -108,32 +86,30 @@ int read_parameters(char **argv)
         return 0;        
     }
 
-    printf("Counting Triangles of Graph retrieved from input file: %s\n", input_filename);
+    printf("Contando los triangulos del grafo extraido de: %s\n", input_filename);
     return 1;
 }
 
 int main(int argc, char **argv)
 {
-    // Run-time parameters check.
     if (!read_parameters(argv)) {
-        printf("Program terminates.\n");
+        printf("Programa termina.\n");
         return -1;    
     }
 
-    int fscanf_result = fscanf(fin, "%d \n", &nodes_count); // Retrieve Graph nodes count.
+    int fscanf_result = fscanf(fin, "%d \n", &nodes_count);
     if (fscanf_result != 1 || nodes_count > 0) {
         printf("Conteo de nodos: %d\n", nodes_count);
         printf("Algoritmo iniciado, por favor espere...\n");
         initialize_matrix();
         clock_t t1 = clock();
-        calculate_triangles(); // Perform algorith calculations.            
+        calculate_triangles();            
         clock_t t2 = clock();
         printf("Algoritmo finalizado!\n");
-        printf("Time spend: %f secs\n", ((float)t2 -t1) / CLOCKS_PER_SEC);    
+        printf("Tiemoi usado: %f segs\n", ((float)t2 -t1) / CLOCKS_PER_SEC);    
     } else {
-        printf("File is empty.\n");        
+        printf("Archivo vacio.\n");        
     }
     fclose(fin);
-    printf("Program terminates.\n");
     return 0;
 }

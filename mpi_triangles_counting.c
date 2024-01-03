@@ -1,18 +1,3 @@
-// --------------------------------------------------------------------------------
-//
-// This program implements Scalable Triangle Counting algorithm
-// introduced by S.Acerm, A.Yasar, S.Rajamanickam, M.Wolf and U.Catalyurek.
-// In this version, MPI standar is used for parallelizing the algorithm.
-// Graph Matrix is conformally partioned to blocks, based on MPI processes.
-// Each process is assigned with a block and calculate a local triangles count.
-// In order to calculate the local triangles count, required blocks are retrieved
-// from other processes, based on the algorithm.
-// Graph is read from an input file created by RandomGraph generator by S.Pettie 
-// and V.Ramachandran.
-//
-// Author: Angelos Stamatiou, February 2020
-//
-// --------------------------------------------------------------------------------
 
 #include <mpi.h>
 #include <stdio.h>
@@ -128,9 +113,9 @@ int read_parameters(char **argv)
     return 1;
 }
 
-// This function reduces local triangles counts to master process P0.
-// If all process have been assigned with blocks, MPI_Reduce is used,
-// else each assigned slave process sends its local triangles count to the master process.
+// Reduce el conteo de traingulos locales al proceso master 
+// Si todos los procesos fueron asignados con bloques se utiliza mpi reduce
+// sino cada proceso manda su resultado local al master
 void reduce_triangles_counts()
 {
     int total_triangles=0;
@@ -154,8 +139,6 @@ void reduce_triangles_counts()
     }    
 }
 
-// In this function, master process calculates its local triangles count, by performing 
-// the (M*M).*M calculation, based on the algorithm.
 void calculate_local_triangles_master()
 {
     int i,j,k;
@@ -187,8 +170,6 @@ void calculate_local_triangles_master()
     free(qmap);
 }
 
-// In this function, each slave process calculates is local triangles count, by performing
-// the (M*M).*M calculation, based on the algorithm.
 void calculate_local_triangles_slave()
 {
     int i,j,k,b;
@@ -216,8 +197,9 @@ void calculate_local_triangles_slave()
         }
     }
     
-    // Computing remaining Block(assigned) for processes in the Q map diagonal, as multiplication_blocks 
-    // and el_multiplication_blocks matrices are not the same size.
+    // Computando los bloques asignados faltantes para los processos en el Q map diagonal
+    // ya que las matrices de los bloques de mult de matrices y elementos no son del mismo
+    //tamano
     if (q_i == q_j) {
         for (i = 0; i < n; i++) {
             for (j = 0; j < n; j++) {
@@ -237,17 +219,17 @@ void calculate_local_triangles_slave()
     free(qmap);    
 }
 
-// In this function, each slave process retrieves required Blocks from other processes,
-// in order to perform its calculations. Each process finds which processes have its required
-// Blocks, based on the Q Map. Each process requires blocks from the row of its column
-// in the Q Map, for the matrix multiplication, and the previous blocks of its row in the Q Map,
-// for the multiplication per element.
+// En esta funcion, cada proceso esclavo recibe los bloques requeridos de otros procesos
+// para realizar este calculo. Cada proceso debe encontrar que proceso tiene su bloque requerido
+// basados en el Q Map. Cada proceso requiere bloques de la fila de su columna en el Q map
+// para la multiplicacion de matrices, y los blqoues previos de su fila en el Q Map,
+// para la multiplicacion por elementos
 void receive_blocks_from_other_processes()
 {
     int i,j,k;
     MPI_Status status;
 
-    // Allocate memory for retrieving required Blocks.
+    // Guardar memoria para recibir bloques requeridos
     multiplication_blocks = (int**)malloc(sizeof(int*) * n + sizeof(int) * n * ((q_j+1)*n));
     if (multiplication_blocks == NULL) {
       printf("Error: malloc for multiplication_blocks failed.\n");
@@ -272,8 +254,8 @@ void receive_blocks_from_other_processes()
         buffer[i] = (buffer_ptr + n * i);    
     }
 
-    // Retrieve blocks from the row of process column in Q Map.
-    // Processes in column 0 require only the Block of master process.
+    // Recibe blqoues de la fila de proceso columna en el Q Map.
+    // Los procesos de la columan 0 solo requieren los bloques del proceso master.
     mult_blocks_receive_counter=0;
     if (q_j == 0) {
         mult_blocks_receive_counter++;        
@@ -298,14 +280,14 @@ void receive_blocks_from_other_processes()
         }
     }
     
-    // Send assigned Blocks to the processes in the column of process row in Q Map. 
+    //Enviar bloques asignados en la columna de proceso fila en el Q Map. 
     for (i = q_i; i < q; i++) {
         if (qmap[i][q_i] != rank) {
             MPI_Send(&block[0][0], n*n, MPI_INT, qmap[i][q_i], 0, MPI_COMM_WORLD);        
         }            
     }
 
-    // Retrieve blocks from the previous processes in the row of process in Q Map.
+    // Recibe bloques de los procesos previos en la fila de procesos en el Q Map.
     el_mult_blocks_receive_counter=0;
     for (j = 0; j < q_j; j++) {
         el_mult_blocks_receive_counter++;
@@ -317,21 +299,21 @@ void receive_blocks_from_other_processes()
         }
     }
 
-    // Copy assigned Block in last position of el_multiplication_blocks.
+    // Copiar bloque asignado en la ultima posicion de el_multiplication_blocks.
     for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) {
             el_multiplication_blocks[i][(el_mult_blocks_receive_counter*n)+j] = block[i][j];
         }
     }
 
-    // Send assigned Block to the next processes in the row of process in Q Map.
+    // Enviar bloque asignado a los siguientes procesos en la fila del proceso en el Q Map.
     for (j = q_j + 1; j < q_i + 1; j++) {
         MPI_Send(&block[0][0], n*n, MPI_INT, qmap[q_i][j], 1, MPI_COMM_WORLD);
     }
     free(buffer);
 }
 
-// This function retrieves Q mapping from master process.
+// Recibe el mapeo de Q desde el proceso maestro
 void retrieve_q_mapping()
 {
     int i,j;
@@ -344,7 +326,7 @@ void retrieve_q_mapping()
     for (i = 0; i < q; i++) {
         qmap[i] = (qptr + q * i);
     }
-    // Retrieve Q mapping from P0.
+    // Recibe q mapping del maestro
     MPI_Bcast(*qmap, q*q, MPI_INT, 0, MPI_COMM_WORLD);
     for (i = 0; i < q; i++) {
         for (j = 0; j < i+1; j++) {
@@ -358,27 +340,24 @@ void retrieve_q_mapping()
     }
 }
 
-// This function retrieves Process assigned Block.
+// Recibe el bloque asignado del proceso
 void receive_block()
 {
     int i,j,k;
     MPI_Status status;
-    // Retrieve Block size in order to allocate memory for retrieving the Block.
+    // Recibe tamano del bloque para guardar memoria para recibir el bloque.
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
     block = (int**)malloc(sizeof(int*) * n + sizeof(int) * n * n);
-    if (block == NULL) {
-      printf("Error: malloc for block failed.\n");
-      exit(1);
-    }
     int* ptr = (int*)(block + n);
     for (i = 0; i < n; i++) {
         block[i] = (ptr + n * i);            
     }
-    // Retrieve assigned Block by P0.
+    // Recibe bloque asignado por el maestro
     MPI_Recv(*block, n*n, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);    
 }
 
-// This function, used by master process, calculates Q mapping and send each process its assigned Block.
+
+// Usada por el proceso maestro, calcula el Q mapping y envia a cada proceso su bloque asignado
 void scatter_blocks()
 {
     int i,j,p,q_row,q_column,p_row,p_column,counter;
@@ -393,7 +372,7 @@ void scatter_blocks()
         qmap[i] = (qptr + q * i);
     }
 
-    // Broadcast Block size to rest processes.
+    // Hace broadcaste del tamano del bloque a los demas procesos
     n = nodes_count/q;
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);    
     block = (int**)malloc(sizeof(int*) * n + sizeof(int) * n * n);
@@ -406,13 +385,13 @@ void scatter_blocks()
         block[i] = (ptr + n * i);
     }
 
-    // Calculate Q mapping, and send each process its assigned Block.
-    // Master process will position each process Id sequentially in a top to bottom manner.
-    // E.G a 4x4 Q Map will look like:
+    // Calcula el Q mapping, y envia a cada proceso su bloque asignado.
+    // El proceso maestro colocara el Id de cada proceso sequencialmente de arriba hacia abajo.
+    // Por ejemplo a un Q Map de 4x4 se vera asi:
     //             [0, 0, 0, 0]
-    //            [1, 4, 0, 0]
-    //            [2, 5, 7, 0]
-    //            [3, 6, 8, 9]
+    //             [1, 4, 0, 0]
+    //             [2, 5, 7, 0]
+    //             [3, 6, 8, 9]
     q_row = 1;
     q_column = 0;
     counter = 0;
@@ -440,14 +419,14 @@ void scatter_blocks()
         }                    
     }
 
-    // Master process keeps Matrix first block.
+    // Mater tiene el primer bloque de la matriz.
     for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) {
             block[i][j] = matrix[i][j];
         }        
     }
 
-    // Broadcast Q Mapping to rest processes.
+    // Hace Broadcast del Q Mapping al resto de procesos.
     MPI_Bcast(&qmap[0][0], q*q, MPI_INT, 0, MPI_COMM_WORLD);
 }
 
@@ -458,20 +437,20 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MPI_Comm_size(MPI_COMM_WORLD,&size);
     
-    // Each process calculates Q value and blocks count, 
-    // in order to know if it will be assigned with a block.    
+    // Cada proceso calcula su valor de Q y la cantidad de bloques
+    // de esa forma sabra si un blqoue se le sera asignado   
     q = (-1+sqrt(1+8*size))/2; // Resolviendo P = Q(Q + 1)/2 para hallar Q
-    blocks_count=((q*(q-1))/2)+q; // Blocks of Q Table that will be computed.
+    blocks_count=((q*(q-1))/2)+q;
     if (rank == 0) {
-        // Run-time parameters check.
+        // Chequeo de parametros
         if (!read_parameters(argv)) {
             printf("Program terminates.\n");
             MPI_Abort(MPI_COMM_WORLD, -1);    
         }
-        int fscanf_result = fscanf(fin, "%d \n", &nodes_count); // Retrieve Graph nodes count.
+        int fscanf_result = fscanf(fin, "%d \n", &nodes_count); 
         if (fscanf_result != 1 || nodes_count > 0) {
             printf("Conteo de nodos: %d\n", nodes_count);
-            // Graph matrix is required to be conformally partitioned to blocks.
+            // La matriz requiere estar particionada conformemente.
             if (nodes_count % q != 0) 
             {
                 nw = nodes_count;
@@ -481,13 +460,13 @@ int main(int argc, char **argv)
                 printf("Algoritmo iniciado, por favor espere...\n");
                 initialize_matrix();
                 clock_t t1 = clock();
-                // When q==1, only one process is required.    
+                // Cuando q = 1realiza el algoritmo serial
                 if (q > 1) {
-                    scatter_blocks(); // Calculate Q mapping and send each process its assigned Block.
-                    calculate_local_triangles_master(); // Calculate local triangles count.
-                    reduce_triangles_counts(); // Retrieve local triangles count from other processes.
+                    scatter_blocks(); 
+                    calculate_local_triangles_master(); 
+                    reduce_triangles_counts(); 
                 } else {
-                    calculate_triangles(); // Perform serial algorithm.
+                    calculate_triangles();
                 }                                                
                 clock_t t2 = clock();
                 printf("Algoritmo Finalizado!\n");
@@ -505,11 +484,11 @@ int main(int argc, char **argv)
             MPI_Abort(MPI_COMM_WORLD, -1);
         }    
     } else if (q > 1 && rank < blocks_count) {
-        receive_block(); // Retrieve assigned block.
-        retrieve_q_mapping(); // Retrieve Q mapping.
-        receive_blocks_from_other_processes(); // Retrieve required blocks from other processes.
-        calculate_local_triangles_slave(mult_blocks_receive_counter); // Calculate local triangles count.
-        reduce_triangles_counts(); // Send local triangles count to process P0.
+        receive_block(); 
+        retrieve_q_mapping();
+        receive_blocks_from_other_processes(); 
+        calculate_local_triangles_slave(mult_blocks_receive_counter); 
+        reduce_triangles_counts();
     }
     MPI_Finalize();
 }
